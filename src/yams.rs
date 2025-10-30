@@ -2,48 +2,96 @@ use std::collections::HashMap;
 
 type Dice = [u8; 5];
 
+#[derive(Clone, Copy)]
 enum CombinationResult {
     Matched(u32),
     NotMatched,
 }
 
 type CombinationChecker = fn(&Dice) -> CombinationResult;
+type RoundResult = (Combination, u32);
+type CaseResult = (CombinationResult, Combination);
+
+#[derive(Eq, PartialEq, Hash, Debug, Copy, Clone)]
+enum Combination {
+    FourOfAKind,
+    FullHouse,
+    ThreeOfAKind,
+    Straight,
+    Yams,
+    Chance,
+}
+
+const ORDERED_COMBINATIONS: [Combination; 6] = [
+    Combination::Yams,
+    Combination::Straight,
+    Combination::FourOfAKind,
+    Combination::FullHouse,
+    Combination::ThreeOfAKind,
+    Combination::Chance,
+];
 
 fn calculate_yams_total_score(rounds: &[Dice]) -> u32 {
-    rounds
-        .iter()
-        .map(|dice| calculate_yams_round_score(dice))
-        .sum()
+    let mut available_combinations = ORDERED_COMBINATIONS.to_vec();
+
+    let mut sum = 0;
+    for dice in rounds {
+        let result = calculate_yams_round_score(dice, &available_combinations);
+
+        match result {
+            Some((combination, score)) => {
+                available_combinations.retain(|&c| c != combination);
+                sum += score;
+            }
+            None => {}
+        }
+    }
+    sum
 }
 
-fn calculate_yams_round_score(dice: &Dice) -> u32 {
-    let cases: Vec<CombinationChecker> = vec![
-        check_four_of_a_kind,
-        check_full_house,
-        check_three_of_a_kind,
-        check_straight,
-        check_yams,
-    ];
+fn calculate_yams_round_score(
+    dice: &Dice,
+    available_combinations: &[Combination],
+) -> Option<(Combination, u32)> {
+    let case_map: HashMap<Combination, CombinationChecker> = HashMap::from([
+        (
+            Combination::FourOfAKind,
+            check_four_of_a_kind as CombinationChecker,
+        ),
+        (Combination::FullHouse, check_full_house),
+        (Combination::ThreeOfAKind, check_three_of_a_kind),
+        (Combination::Straight, check_straight),
+        (Combination::Yams, check_yams),
+        (Combination::Chance, check_chance),
+    ]);
 
-    let case_results: Vec<_> = cases.iter().map(|case| case(dice)).collect();
+    let checks = available_combinations
+        .iter()
+        .filter_map(|combination| case_map.get(combination).map(|check| (check, combination)))
+        .collect::<Vec<_>>();
+    let case_results: Vec<CaseResult> = checks
+        .iter()
+        .map(|(case, combination)| (case(dice), **combination))
+        .collect();
     let max_score = get_best_case(&case_results);
 
-    match max_score {
-        Some(score) => score,
-        None => calculate_chance_score(dice),
-    }
+    max_score.and_then(|case| match case {
+        (CombinationResult::Matched(score), combination) => Some((combination, score)),
+        (CombinationResult::NotMatched, _) => None,
+    })
 }
 
-fn get_best_case(cases: &[CombinationResult]) -> Option<u32> {
-    let matched_cases = cases.iter().filter_map(|case| {
-        if let CombinationResult::Matched(score) = case {
-            Some(score)
-        } else {
-            None
-        }
-    });
-
-    matched_cases.max().copied()
+fn get_best_case(cases: &[(CombinationResult, Combination)]) -> Option<CaseResult> {
+    cases
+        .iter()
+        .max_by(|a, b| match a.0 {
+            CombinationResult::NotMatched => std::cmp::Ordering::Less,
+            CombinationResult::Matched(a_score) => match b.0 {
+                CombinationResult::NotMatched => std::cmp::Ordering::Greater,
+                CombinationResult::Matched(b_score) => a_score.cmp(&b_score),
+            },
+        })
+        .copied()
 }
 
 fn check_four_of_a_kind(dice: &Dice) -> CombinationResult {
@@ -123,6 +171,11 @@ fn is_yams(dice: &Dice) -> bool {
     dice.iter().all(|&die| die == dice[0])
 }
 
+fn check_chance(dice: &Dice) -> CombinationResult {
+    let sum: u8 = dice.iter().sum();
+    CombinationResult::Matched(sum as u32)
+}
+
 fn calculate_chance_score(dice: &Dice) -> u32 {
     let sum: u8 = dice.iter().sum();
     sum as u32
@@ -130,42 +183,60 @@ fn calculate_chance_score(dice: &Dice) -> u32 {
 
 #[cfg(test)]
 mod test {
-    use super::calculate_yams_round_score;
+    use super::{Combination, ORDERED_COMBINATIONS, calculate_yams_round_score};
 
     #[test]
     fn test_three_of_a_kind() {
         let dice = [3, 3, 3, 2, 5];
-        assert_eq!(calculate_yams_round_score(&dice), 28);
+        assert_eq!(
+            calculate_yams_round_score(&dice, &ORDERED_COMBINATIONS),
+            Some((Combination::ThreeOfAKind, 28)),
+        );
     }
 
     #[test]
     fn test_four_of_a_kind() {
         let dice = [4, 4, 4, 4, 1];
-        assert_eq!(calculate_yams_round_score(&dice), 35);
+        assert_eq!(
+            calculate_yams_round_score(&dice, &ORDERED_COMBINATIONS),
+            Some((Combination::FourOfAKind, 35)),
+        );
     }
 
     #[test]
     fn test_full_house() {
         let dice = [2, 2, 3, 3, 3];
-        assert_eq!(calculate_yams_round_score(&dice), 30);
+        assert_eq!(
+            calculate_yams_round_score(&dice, &ORDERED_COMBINATIONS),
+            Some((Combination::FullHouse, 30)),
+        );
     }
 
     #[test]
     fn test_straight() {
         let dice = [1, 2, 3, 4, 5];
-        assert_eq!(calculate_yams_round_score(&dice), 40);
+        assert_eq!(
+            calculate_yams_round_score(&dice, &ORDERED_COMBINATIONS),
+            Some((Combination::Straight, 40)),
+        );
     }
 
     #[test]
     fn test_yams() {
         let dice = [6, 6, 6, 6, 6];
-        assert_eq!(calculate_yams_round_score(&dice), 50);
+        assert_eq!(
+            calculate_yams_round_score(&dice, &ORDERED_COMBINATIONS),
+            Some((Combination::Yams, 50)),
+        );
     }
 
     #[test]
     fn test_chance() {
         let dice = [1, 2, 3, 4, 6];
-        assert_eq!(calculate_yams_round_score(&dice), 16);
+        assert_eq!(
+            calculate_yams_round_score(&dice, &ORDERED_COMBINATIONS),
+            Some((Combination::Chance, 16)),
+        );
     }
 
     #[test]
@@ -178,5 +249,14 @@ mod test {
             [1, 2, 3, 4, 6], // Chance: 16
         ];
         assert_eq!(super::calculate_yams_total_score(&rounds), 149);
+    }
+
+    #[test]
+    fn test_no_repeat_combination() {
+        let rounds = vec![
+            [1, 1, 1, 2, 2], // Full house: 30
+            [2, 2, 2, 3, 3], // Three of a kind: 28
+            [3, 3, 3, 4, 4], // Chance: 17
+        ];
     }
 }
