@@ -1,3 +1,5 @@
+mod yams;
+
 fn main() {
     println!("Hello, world!");
 }
