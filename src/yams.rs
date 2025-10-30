@@ -22,14 +22,28 @@ fn calculate_yams_round_score(dice: &Dice) -> u32 {
         check_full_house,
         check_three_of_a_kind,
         check_straight,
+        check_yams,
     ];
-    for case in cases {
-        if let CombinationResult::Matched(score) = case(dice) {
-            return score;
-        }
-    }
 
-    calculate_chance_score(dice)
+    let case_results: Vec<_> = cases.iter().map(|case| case(dice)).collect();
+    let max_score = get_best_case(&case_results);
+
+    match max_score {
+        Some(score) => score,
+        None => calculate_chance_score(dice),
+    }
+}
+
+fn get_best_case(cases: &[CombinationResult]) -> Option<u32> {
+    let matched_cases = cases.iter().filter_map(|case| {
+        if let CombinationResult::Matched(score) = case {
+            Some(score)
+        } else {
+            None
+        }
+    });
+
+    matched_cases.max().copied()
 }
 
 fn check_four_of_a_kind(dice: &Dice) -> CombinationResult {
@@ -97,6 +111,18 @@ fn contains_straight(dice: &Dice) -> bool {
     sorted_dice == [1, 2, 3, 4, 5] || sorted_dice == [2, 3, 4, 5, 6]
 }
 
+fn check_yams(dice: &Dice) -> CombinationResult {
+    if is_yams(dice) {
+        CombinationResult::Matched(50)
+    } else {
+        CombinationResult::NotMatched
+    }
+}
+
+fn is_yams(dice: &Dice) -> bool {
+    dice.iter().all(|&die| die == dice[0])
+}
+
 fn calculate_chance_score(dice: &Dice) -> u32 {
     let sum: u8 = dice.iter().sum();
     sum as u32
@@ -128,6 +154,12 @@ mod test {
     fn test_straight() {
         let dice = [1, 2, 3, 4, 5];
         assert_eq!(calculate_yams_round_score(&dice), 40);
+    }
+
+    #[test]
+    fn test_yams() {
+        let dice = [6, 6, 6, 6, 6];
+        assert_eq!(calculate_yams_round_score(&dice), 50);
     }
 
     #[test]
