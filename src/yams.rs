@@ -67,11 +67,11 @@ fn calculate_yams_round_score(
 
     let checks = available_combinations
         .iter()
-        .filter_map(|combination| case_map.get(combination).map(|check| (check, combination)))
+        .filter_map(|combination| case_map.get_key_value(combination))
         .collect::<Vec<_>>();
     let case_results: Vec<CaseResult> = checks
         .iter()
-        .map(|(case, combination)| (case(dice), **combination))
+        .map(|(combination, case)| (case(dice), **combination))
         .collect();
     let max_score = get_best_case(&case_results);
 
