@@ -1,7 +1,9 @@
 type Dice = [u8; 5];
 
 pub fn calculate_yams_score(dice: &Dice) -> u32 {
-    if contains_three_of_a_kind(dice) {
+    if contains_four_of_a_kind(dice) {
+        35
+    } else if contains_three_of_a_kind(dice) {
         28
     } else {
         let sum: u8 = dice.iter().sum();
@@ -9,9 +11,18 @@ pub fn calculate_yams_score(dice: &Dice) -> u32 {
     }
 }
 
+fn contains_four_of_a_kind(dice: &Dice) -> bool {
+    for die in dice {
+        if dice.iter().filter(|x| *x == die).count() >= 4 {
+            return true;
+        }
+    }
+    false
+}
+
 fn contains_three_of_a_kind(dice: &Dice) -> bool {
-    for value in dice {
-        if dice.iter().filter(|x| *x == value).count() >= 3 {
+    for die in dice {
+        if dice.iter().filter(|x| *x == die).count() >= 3 {
             return true;
         }
     }
@@ -26,6 +37,11 @@ mod test {
     fn test_three_of_a_kind() {
         let dice = [3, 3, 3, 2, 5];
         assert_eq!(calculate_yams_score(&dice), 28);
+    }
+
+    fn test_four_of_a_kind() {
+        let dice = [4, 4, 4, 4, 1];
+        assert_eq!(calculate_yams_score(&dice), 35);
     }
 
     #[test]
