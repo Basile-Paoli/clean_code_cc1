@@ -142,8 +142,9 @@ mod test {
             [3, 3, 3, 2, 5], // Three of a kind: 28
             [4, 4, 4, 4, 1], // Four of a kind: 35
             [2, 2, 3, 3, 3], // Full house: 30
-            [1, 2, 3, 4, 5], // Chance: 15
+            [1, 2, 3, 4, 5], // Straight: 40
+            [1, 2, 3, 4, 6], // Chance: 16
         ];
-        assert_eq!(super::calculate_yams_total_score(&rounds), 108);
+        assert_eq!(super::calculate_yams_total_score(&rounds), 149);
     }
 }
