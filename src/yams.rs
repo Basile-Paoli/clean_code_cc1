@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::collections::HashMap;
 
 type Dice = [u8; 5];
@@ -7,7 +8,6 @@ enum CombinationResult {
     Matched(u32),
     NotMatched,
 }
-
 type CombinationChecker = fn(&Dice) -> CombinationResult;
 type RoundResult = (Combination, u32);
 type CaseResult = (CombinationResult, Combination);
@@ -52,8 +52,8 @@ fn calculate_yams_total_score(rounds: &[Dice]) -> u32 {
 fn calculate_yams_round_score(
     dice: &Dice,
     available_combinations: &[Combination],
-) -> Option<(Combination, u32)> {
-    let case_map: HashMap<Combination, CombinationChecker> = HashMap::from([
+) -> Option<RoundResult> {
+    let combination_to_checker: HashMap<Combination, CombinationChecker> = HashMap::from([
         (
             Combination::FourOfAKind,
             check_four_of_a_kind as CombinationChecker,
@@ -67,13 +67,15 @@ fn calculate_yams_round_score(
 
     let checks = available_combinations
         .iter()
-        .filter_map(|combination| case_map.get_key_value(combination))
+        .filter_map(|combination| combination_to_checker.get_key_value(combination))
         .collect::<Vec<_>>();
-    let case_results: Vec<CaseResult> = checks
+
+    let check_results: Vec<CaseResult> = checks
         .iter()
-        .map(|(combination, case)| (case(dice), **combination))
+        .map(|(combination, checker)| (checker(dice), **combination))
         .collect();
-    let max_score = get_best_case(&case_results);
+
+    let max_score = get_best_case(&check_results);
 
     max_score.and_then(|case| match case {
         (CombinationResult::Matched(score), combination) => Some((combination, score)),
@@ -85,9 +87,9 @@ fn get_best_case(cases: &[(CombinationResult, Combination)]) -> Option<CaseResul
     cases
         .iter()
         .max_by(|a, b| match a.0 {
-            CombinationResult::NotMatched => std::cmp::Ordering::Less,
+            CombinationResult::NotMatched => Ordering::Less,
             CombinationResult::Matched(a_score) => match b.0 {
-                CombinationResult::NotMatched => std::cmp::Ordering::Greater,
+                CombinationResult::NotMatched => Ordering::Greater,
                 CombinationResult::Matched(b_score) => a_score.cmp(&b_score),
             },
         })
@@ -258,5 +260,7 @@ mod test {
             [2, 2, 2, 3, 3], // Three of a kind: 28
             [3, 3, 3, 4, 4], // Chance: 17
         ];
+
+        assert_eq!(super::calculate_yams_total_score(&rounds), 75);
     }
 }
