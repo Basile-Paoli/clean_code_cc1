@@ -2,21 +2,40 @@ use std::collections::HashMap;
 
 type Dice = [u8; 5];
 
+enum CombinationResult {
+    Matched(u32),
+    NotMatched,
+}
+
+type CombinationChecker = fn(&Dice) -> CombinationResult;
 
 fn calculate_yams_total_score(rounds: &[Dice]) -> u32 {
-    rounds.iter().map(|dice| calculate_yams_round_score(dice)).sum()
+    rounds
+        .iter()
+        .map(|dice| calculate_yams_round_score(dice))
+        .sum()
 }
 
 fn calculate_yams_round_score(dice: &Dice) -> u32 {
+    let cases: Vec<CombinationChecker> = vec![
+        check_four_of_a_kind,
+        check_full_house,
+        check_three_of_a_kind,
+    ];
+    for case in cases {
+        if let CombinationResult::Matched(score) = case(dice) {
+            return score;
+        }
+    }
+
+    calculate_chance_score(dice)
+}
+
+fn check_four_of_a_kind(dice: &Dice) -> CombinationResult {
     if contains_four_of_a_kind(dice) {
-        35
-    } else if contains_full_house(dice) {
-        30
-    } else if contains_three_of_a_kind(dice) {
-        28
+        CombinationResult::Matched(35)
     } else {
-        let sum: u8 = dice.iter().sum();
-        sum as u32
+        CombinationResult::NotMatched
     }
 }
 
@@ -29,12 +48,28 @@ fn contains_four_of_a_kind(dice: &Dice) -> bool {
     false
 }
 
+fn check_full_house(dice: &Dice) -> CombinationResult {
+    if contains_full_house(dice) {
+        CombinationResult::Matched(30)
+    } else {
+        CombinationResult::NotMatched
+    }
+}
+
 fn contains_full_house(dice: &Dice) -> bool {
     let mut counts = HashMap::new();
     for die in dice {
         *counts.entry(die).or_insert(0) += 1;
     }
     counts.values().any(|&count| count == 3) && counts.values().any(|&count| count == 2)
+}
+
+fn check_three_of_a_kind(dice: &Dice) -> CombinationResult {
+    if contains_three_of_a_kind(dice) {
+        CombinationResult::Matched(28)
+    } else {
+        CombinationResult::NotMatched
+    }
 }
 
 fn contains_three_of_a_kind(dice: &Dice) -> bool {
@@ -44,6 +79,11 @@ fn contains_three_of_a_kind(dice: &Dice) -> bool {
         }
     }
     false
+}
+
+fn calculate_chance_score(dice: &Dice) -> u32 {
+    let sum: u8 = dice.iter().sum();
+    sum as u32
 }
 
 #[cfg(test)]
